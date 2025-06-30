@@ -54,7 +54,7 @@ Create a restaurant landing page in under 5 minutes.
 
 ## 🏷️ Required badge
 
-[![Made with Bolt](./public/bolt-badge.png)](https://bolt.new)
+[![Made with Bolt](./public/white_circle_360x360.png)](https://bolt.new)
 
 ## 📃 License
 
@@ -111,7 +111,7 @@ Créez une landing page pour votre restaurant en moins de 5 minutes.
 
 ### 🏷️ Badge requis
 
-[![Made with Bolt](./public/bolt-badge.png)](https://bolt.new)
+[![Made with Bolt](./public/white_circle_360x360.png)](https://bolt.new)
 
 ### 📃 Licence
 
