@@ -1,0 +1,140 @@
+name: Personnalisation IA Landing Page
+
+on:
+  workflow_dispatch:
+    inputs:
+      restaurant_name:
+        description: 'Nom du restaurant'
+        required: true
+        type: string
+      customization_request:
+        description: 'Demande de personnalisation'
+        required: true
+        type: string
+      restaurant_data:
+        description: 'Données du restaurant (JSON)'
+        required: true
+        type: string
+      timestamp:
+        description: 'Timestamp de la demande'
+        required: true
+        type: string
+
+jobs:
+  customize:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: |
+        npm install axios
+        
+    - name: Generate AI Customization
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        RESTAURANT_NAME: ${{ inputs.restaurant_name }}
+        CUSTOMIZATION_REQUEST: ${{ inputs.customization_request }}
+        RESTAURANT_DATA: ${{ inputs.restaurant_data }}
+        TIMESTAMP: ${{ inputs.timestamp }}
+      run: |
+        node << 'EOF'
+        const axios = require('axios');
+        const fs = require('fs');
+        
+        async function generateCustomization() {
+          try {
+            const prompt = `Tu es un expert en design web et CSS. Génère du CSS personnalisé pour une landing page de restaurant basé sur cette demande :
+            
+            Restaurant: ${process.env.RESTAURANT_NAME}
+            Demande: ${process.env.CUSTOMIZATION_REQUEST}
+            Données: ${process.env.RESTAURANT_DATA}
+            
+            Génère uniquement du CSS valide qui peut être injecté dans une page HTML existante. 
+            Concentre-toi sur :
+            - Les couleurs et palettes
+            - Les polices et typographie  
+            - Les animations et transitions
+            - Les effets visuels
+            - L'ambiance générale
+            
+            Réponds uniquement avec le code CSS, sans explications.`;
+            
+            const response = await axios.post('https://api.anthropic.com/v1/messages', {
+              model: 'claude-3-sonnet-20240229',
+              max_tokens: 2000,
+              messages: [{
+                role: 'user',
+                content: prompt
+              }]
+            }, {
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': process.env.ANTHROPIC_API_KEY,
+                'anthropic-version': '2023-06-01'
+              }
+            });
+            
+            const customCSS = response.data.content[0].text;
+            
+            // Sauvegarder le résultat
+            const result = {
+              success: true,
+              customCSS: customCSS,
+              timestamp: process.env.TIMESTAMP,
+              restaurant: process.env.RESTAURANT_NAME
+            };
+            
+            fs.writeFileSync('customization-result.json', JSON.stringify(result, null, 2));
+            console.log('Personnalisation générée avec succès');
+            
+          } catch (error) {
+            console.error('Erreur:', error.message);
+            
+            const errorResult = {
+              success: false,
+              error: error.message,
+              timestamp: process.env.TIMESTAMP,
+              restaurant: process.env.RESTAURANT_NAME
+            };
+            
+            fs.writeFileSync('customization-result.json', JSON.stringify(errorResult, null, 2));
+          }
+        }
+        
+        generateCustomization();
+        EOF
+        
+    - name: Upload result
+      uses: actions/upload-artifact@v4
+      with:
+        name: customization-result-${{ inputs.timestamp }}
+        path: customization-result.json
+        retention-days: 7
+        
+    - name: Create result issue
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const result = JSON.parse(fs.readFileSync('customization-result.json', 'utf8'));
+          
+          const title = `Personnalisation ${result.success ? 'réussie' : 'échouée'} - ${result.restaurant}`;
+          const body = result.success 
+            ? `## ✅ Personnalisation générée avec succès\n\n**Restaurant:** ${result.restaurant}\n**Timestamp:** ${result.timestamp}\n\n### CSS généré:\n\`\`\`css\n${result.customCSS}\n\`\`\``
+            : `## ❌ Erreur lors de la personnalisation\n\n**Restaurant:** ${result.restaurant}\n**Timestamp:** ${result.timestamp}\n**Erreur:** ${result.error}`;
+          
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: title,
+            body: body,
+            labels: ['customization', result.success ? 'success' : 'error']
+          });
